@@ -1,0 +1,59 @@
+name: hoop-poc
+
+services:
+
+  postgres:
+    image: postgres:17
+    environment:
+      POSTGRES_USER: postgres
+      POSTGRES_PASSWORD: postgres
+      POSTGRES_DB: postgres
+      PGUSER: postgres
+    volumes:
+      - postgres_data:/var/lib/postgresql/data
+      - ./postgres/init:/docker-entrypoint-initdb.d:ro
+    ports:
+      - "5432:5432"
+    healthcheck:
+      test: ["CMD-SHELL", "pg_isready -U postgres"]
+      interval: 3s
+      timeout: 5s
+      retries: 15
+      start_period: 10s
+    networks: [hoop-net]
+
+  flyway:
+    image: flyway/flyway:10
+    command: >
+      -url=jdbc:postgresql://postgres:5432/appdb
+      -user=appuser
+      -password=apppass
+      -connectRetries=15
+      migrate
+    volumes:
+      - ./flyway/migrations:/flyway/sql:ro
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [hoop-net]
+
+  hoop:
+    image: hoophq/hoop:latest
+    command: ["hoop", "start", "sidecar", "--config", "/etc/hoop/config.yaml"]
+    volumes:
+      - ./hoop/config.yaml:/etc/hoop/config.yaml:ro
+      - ./runbooks:/etc/hoop/runbooks:ro
+    ports:
+      - "15432:15432"  # PostgreSQL proxy — connect here instead of :5432
+      - "19000:19000"  # Hoop admin API
+    depends_on:
+      postgres:
+        condition: service_healthy
+    networks: [hoop-net]
+
+volumes:
+  postgres_data:
+
+networks:
+  hoop-net:
+    driver: bridge

@@ -1,0 +1,34 @@
+log_level: info
+
+admin:
+  listen: 0.0.0.0:19000
+
+audit:
+  file: "-"
+  memory_buffer: 256
+  query_sessions: 500
+
+pii:
+  entities: [EMAIL_ADDRESS, US_SSN, CREDIT_CARD]
+
+mask:
+  enabled: true
+  rules:
+    - {name: emails, entity: EMAIL_ADDRESS, strategy: redact}
+
+policy:
+  enforce: true
+  rules:
+    - name: no-destructive-sql
+      type: operation
+      operations: [drop, delete, truncate]
+      message: destructive statements are not permitted
+
+runbooks:
+  path: /etc/hoop/runbooks
+
+listeners:
+  - name: appdb
+    protocol: postgres
+    listen: 0.0.0.0:15432
+    upstream: postgres:5432
